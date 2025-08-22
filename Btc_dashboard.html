@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BTC Personal Trading Dashboard — Complete</title>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#111821; --muted:#7e8a97; --text:#e6eef7;
+      --accent:#00d1ff; --up:#22c55e; --down:#ef4444; --warn:#f59e0b;
+      --card:#0f1620; --border:#1f2a37;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+    .container{max-width:1200px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+    .disclaimer{background:linear-gradient(90deg,#1a2431,#1a2431);border:1px solid var(--border);padding:12px 16px;border-radius:14px;font-weight:600;text-align:center;line-height:1.4}
+    .top{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+    @media(max-width:950px){.top{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+    .hero{display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(180deg,#0f1620,#0c121a);border:1px solid var(--border);border-radius:20px;padding:20px}
+    .price-block{display:flex;flex-direction:column;gap:8px}
+    .price{font-size:40px;font-weight:800;letter-spacing:0.3px}
+    .price .small{font-size:14px;color:var(--muted);font-weight:600;margin-left:6px}
+    .advice{text-align:right;display:flex;flex-direction:column;gap:8px;min-width:220px}
+    .advice .label{font-size:24px;font-weight:900;padding:8px 12px;border-radius:12px;display:inline-block}
+    .label.buy{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.4);color:var(--up)}
+    .label.sell{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.4);color:var(--down)}
+    .label.hold{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);color:var(--warn)}
+    .confidence{height:8px;background:#0a1017;border-radius:999px;border:1px solid var(--border);position:relative;overflow:hidden}
+    .confidence > span{position:absolute;left:0;top:0;height:100%;width:0%;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e)}
+    .confidence-note{font-size:12px;color:var(--muted);margin-top:6px}
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:10px}
+    @media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}}
+    .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .stat .k{font-size:12px;color:var(--muted)}
+    .stat .v{font-size:18px;font-weight:800;margin-top:4px}
+    .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px}
+    .tf{display:flex;gap:8px}
+    .btn{padding:8px 12px;border-radius:10px;border:1px solid var(--border);color:var(--text);background:#0e141c;cursor:pointer;font-weight:700}
+    .btn.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 2px rgba(0,209,255,.08) inset}
+    #chart{height:420px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media(max-width:950px){.grid2{grid-template-columns:1fr}}
+    .gauge-wrap{display:flex;flex-direction:column;gap:10px}
+    .gauge{position:relative;height:22px;border-radius:999px;background:linear-gradient(90deg,#ef4444,#f59e0b,#22c55e);overflow:hidden;border:1px solid var(--border)}
+    .gauge-pointer{position:absolute;top:-4px;width:2px;height:30px;background:#fff;left:50%;transform:translateX(-50%);box-shadow:0 0 8px rgba(255,255,255,.6)}
+    .gauge-legend{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+    .indicators{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    @media(max-width:800px){.indicators{grid-template-columns:1fr}}
+    .ind-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}
+    .ind-title{font-size:12px;color:var(--muted);font-weight:700}
+    .ind-value{font-size:20px;font-weight:900;margin-top:4px}
+    .up{color:var(--up)} .down{color:var(--down)}
+    .foot{text-align:center;color:var(--muted);font-size:12px}
+    a,button{outline:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="disclaimer">⚠️ This is NOT financial advice. This is an automated technical analysis tool for educational purposes only. Cryptocurrency investments are highly volatile and risky. You alone are responsible for your trading decisions.</div>
+
+    <div class="top">
+      <div class="hero card">
+        <div class="price-block">
+          <div class="price" id="bigPrice">$— <span class="small" id="priceChange">24h: —%</span></div>
+          <div class="stats">
+            <div class="stat"><div class="k">24h High</div><div class="v" id="high24">—</div></div>
+            <div class="stat"><div class="k">24h Low</div><div class="v" id="low24">—</div></div>
+            <div class="stat"><div class="k">24h Volume</div><div class="v" id="vol24">—</div></div>
+            <div class="stat"><div class="k">Market Cap</div><div class="v" id="mcap">—</div></div>
+            <div class="stat"><div class="k">Last Updated</div><div class="v" id="updated">—</div></div>
+          </div>
+        </div>
+
+        <div class="advice">
+          <div id="adviceLabel" class="label hold">HOLD: Awaiting clearer signal.</div>
+          <div class="confidence"><span id="confBar"></span></div>
+          <div class="confidence-note" id="confText">Confidence: —</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="gauge-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center"><strong>Sentiment Gauge</strong><span id="sentimentText" style="color:var(--muted)">—</span></div>
+          <div class="gauge"><div class="gauge-pointer" id="gaugePointer" style="left:50%"></div></div>
+          <div class="gauge-legend"><span>Extreme Fear</span><span>Neutral</span><span>Extreme Greed</span></div>
+
+          <div class="indicators">
+            <div class="ind-card"><div class="ind-title">RSI(14)</div><div class="ind-value" id="rsiVal">—</div></div>
+            <div class="ind-card"><div class="ind-title">MACD 12/26/9</div><div class="ind-value"><span id="macdVal">—</span> <span class="small" id="macdSig" style="margin-left:8px;color:var(--muted)">—</span></div></div>
+            <div class="ind-card"><div class="ind-title">SMA50 / SMA200</div><div class="ind-value" id="smaVal">—</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <div><strong>BTCUSD — Main Chart</strong></div>
+        <div class="tf">
+          <button class="btn active" data-tf="5m">5m</button>
+          <button class="btn" data-tf="1h">1h</button>
+          <button class="btn" data-tf="1d">1d</button>
+        </div>
+      </div>
+      <div id="chart"></div>
+    </div>
+
+    <div class="card">
+      <strong>Notes</strong>
+      <ul style="margin-top:8px;color:var(--muted);line-height:1.6">
+        <li>Price refreshes every 5 seconds via CoinGecko.</li>
+        <li>Chart uses TradingView Lightweight Charts (client-side only).</li>
+        <li>Signals aggregate RSI, MACD, and SMA cross + price vs MA positioning.</li>
+        <li>Confidence is an estimate based on indicator alignment — not a guarantee.</li>
+      </ul>
+    </div>
+
+    <div class="disclaimer">⚠️ This is NOT financial advice. This is an automated technical analysis tool for educational purposes only. Cryptocurrency investments are highly volatile and risky. You alone are responsible for your trading decisions.</div>
+    <div class="foot">Data source: CoinGecko • Chart: TradingView Lightweight Charts™</div>
+  </div>
+
+  <script>
+  /********************************************************************************
+   * Complete, runnable single-file BTC dashboard with:
+   * - CoinGecko price & OHLC fetching
+   * - Lightweight Charts candlesticks + SMA50 + SMA200
+   * - RSI(14), MACD(12,26,9)
+   * - Sentiment gauge + Advice rules (STRONG/WEAK BUY/SELL / HOLD)
+   * - Timeframe buttons (5m, 1h, 1d)
+   ********************************************************************************/
+
+  // --- Helpers / formatters ---
+  const $ = (id) => document.getElementById(id);
+  const fmtUSDCompact = (n) => {
+    if (n == null || isNaN(n)) return '—';
+    if (n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+    if (n >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return '$' + (n/1e3).toFixed(0) + 'K';
+    return '$' + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
+  const fmtPrice = (n) => n == null || isNaN(n) ? '$—' : '$' + Number(n).toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const nowStr = (iso) => iso ? new Date(iso).toLocaleString() : '—';
+
+  // --- DOM references ---
+  const bigPrice = $('bigPrice');
+  const priceChange = $('priceChange');
+  const high24 = $('high24'), low24 = $('low24'), vol24 = $('vol24'), mcap = $('mcap'), updated = $('updated');
+  const adviceLabel = $('adviceLabel'), confBar = $('confBar'), confText = $('confText');
+  const gaugePointer = $('gaugePointer'), sentimentText = $('sentimentText');
+  const rsiVal = $('rsiVal'), macdVal = $('macdVal'), macdSig = $('macdSig'), smaVal = $('smaVal');
+
+  // --- Chart setup ---
+  const chartContainer = $('chart');
+  const chart = LightweightCharts.createChart(chartContainer, {
+    layout: { background: { color: 'transparent' }, textColor: '#e6eef7' },
+    rightPriceScale: { borderVisible: false },
+    timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
+    grid: { vertLines: { color: 'rgba(255,255,255,0.03)' }, horzLines: { color: 'rgba(255,255,255,0.03)' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    localization: { priceFormatter: p => '$' + p.toFixed(2) }
+  });
+  const candleSeries = chart.addCandlestickSeries({
+    upColor:'#22c55e', downColor:'#ef4444', borderVisible:false, wickUpColor:'#22c55e', wickDownColor:'#ef4444'
+  });
+  const sma50Line = chart.addLineSeries({ color:'#00d1ff', lineWidth:1.6 });
+  const sma200Line = chart.addLineSeries({ color:'#7e8a97', lineWidth:1.6 });
+
+  new ResizeObserver(()=> chart.applyOptions({})).observe(chartContainer);
+
+  // --- CoinGecko endpoints & config ---
+  const CG = {
+    markets: 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin&sparkline=false&price_change_percentage=24h',
+    ohlc: (days) => `https://api.coingecko.com/api/v3/coins/bitcoin/ohlc?vs_currency=usd&days=${days}`
+  };
+  const TF_CFG = {
+    '5m': { days: 1, aggSec: 300 },   // CoinGecko returns ~5m candles for days=1
+    '1h': { days: 7, aggSec: 3600 },  // returns ~hourly for days=7
+    '1d': { days: 365, aggSec: 86400 } // daily
+  };
+
+  // --- Indicator functions ---
+  function SMA(values, period){
+    const out = Array(values.length).fill(null);
+    if(values.length < period) return out;
+    let sum = 0;
+    for(let i=0;i<values.length;i++){
+      sum += values[i];
+      if(i >= period) sum -= values[i-period];
+      if(i >= period - 1) out[i] = sum / period;
+    }
+    return out;
+  }
+  function EMA(values, period){
+    const out = Array(values.length).fill(null);
+    if(values.length === 0) return out;
+    let ema = values[0];
+    out[0] = ema;
+    const k = 2/(period+1);
+    for(let i=1;i<values.length;i++){
+      ema = values[i]*k + ema*(1-k);
+      out[i] = ema;
+    }
+    return out;
+  }
+  function RSI(values, period=14){
+    const out = Array(values.length).fill(null);
+    if(values.length <= period) return out;
+    let gains=0, losses=0;
+    for(let i=1;i<=period;i++){
+      const d = values[i]-values[i-1];
+      if(d>=0) gains += d; else losses += -d;
+    }
+    let avgG=gains/period, avgL=losses/period;
+    out[period] = avgL === 0 ? 100 : 100 - (100/(1 + (avgG/avgL)));
+    for(let i=period+1;i<values.length;i++){
+      const d = values[i]-values[i-1];
+      const g = d > 0 ? d : 0;
+      const l = d < 0 ? -d : 0;
+      avgG = (avgG*(period-1) + g)/period;
+      avgL = (avgL*(period-1) + l)/period;
+      out[i] = avgL === 0 ? 100 : 100 - (100/(1 + (avgG/avgL)));
+    }
+    return out;
+  }
+  function MACD(values, fast=12, slow=26, signal=9){
+    const emaFast = EMA(values, fast);
+    const emaSlow = EMA(values, slow);
+    const macd = values.map((_,i)=> (emaFast[i]!=null && emaSlow[i]!=null) ? (emaFast[i]-emaSlow[i]) : null);
+    const macdClean = macd.map(v=> v==null?0:v);
+    const signalLine = EMA(macdClean, signal).map((v,i)=> macd[i]==null?null:v);
+    const hist = macd.map((v,i)=> (v==null || signalLine[i]==null) ? null : v - signalLine[i]);
+    return { macd, signal: signalLine, hist };
+  }
+
+  // --- Utility: aggregate candles if needed (keeps ascending order) ---
+  function aggregateTo(candles, bucketSec){
+    if(!candles || !candles.length) return [];
+    const out = [];
+    let cur = null;
+    for(const c of candles){
+      const bucket = Math.floor(c.time / bucketSec) * bucketSec;
+      if(!cur || bucket !== cur.time){
+        if(cur) out.push(cur);
+        cur = { time: bucket, open: c.open, high: c.high, low: c.low, close: c.close };
+      } else {
+        cur.high = Math.max(cur.high, c.high);
+        cur.low = Math.min(cur.low, c.low);
+        cur.close = c.close;
+      }
+    }
+    if(cur) out.push(cur);
+    // Ensure ascending
+    out.sort((a,b)=>a.time-b.time);
+    return out;
+  }
+
+  // --- State ---
+  let candleCache = { '5m': [], '1h': [], '1d': [] };
+  let currentTF = '5m';
+
+  // --- Fetchers ---
+  async function getTicker(){
+    const res = await fetch(CG.markets, { cache: 'no-store' });
+    if(!res.ok) throw new Error('Ticker fetch failed');
+    const [d] = await res.json();
+    return {
+      price: d.current_price,
+      high: d.high_24h,
+      low: d.low_24h,
+      volume: d.total_volume,
+      mcap: d.market_cap,
+      changePct: d.price_change_percentage_24h_in_currency ?? d.price_change_percentage_24h,
+      updatedAt: d.last_updated
+    };
+  }
+
+  async function getOHLC(days){
+    const res = await fetch(CG.ohlc(days), { cache: 'no-store' });
+    if(!res.ok) throw new Error('OHLC fetch failed');
+    const arr = await res.json(); // [ [t,o,h,l,c], ... ]
+    return arr.map(a => ({ time: Math.floor(a[0]/1000), open:a[1], high:a[2], low:a[3], close:a[4] })).sort((a,b)=>a.time-b.time);
+  }
+
+  // --- TA / Advice / UI Updates ---
+  function computeTAFromCandles(candles){
+    if(!candles || !candles.length) return null;
+    const closes = candles.map(c=>c.close);
+    const times = candles.map(c=>c.time);
+
+    const sma50 = SMA(closes,50);
+    const sma200 = SMA(closes,200);
+    const rsi14 = RSI(closes,14);
+    const macdObj = MACD(closes,12,26,9);
+
+    const last = closes.length - 1;
+    const price = closes[last];
+    const rsi = rsi14[last];
+    const macd = macdObj.macd[last];
+    const signal = macdObj.signal[last];
+    const hist = macdObj.hist[last];
+    const s50 = sma50[last];
+    const s200 = sma200[last];
+
+    let bull=0, bear=0;
+
+    if(rsi!=null){
+      if(rsi < 30) bull++;
+      else if(rsi > 70) bear++;
+    }
+    if(macd!=null && signal!=null){
+      if(macd > signal && hist>0) bull++;
+      else if(macd < signal && hist<0) bear++;
+    }
+    if(s50!=null && s200!=null){
+      if(s50 > s200) bull++; else if(s50 < s200) bear++;
+      if(price > s50 && price > s200) bull++; else if(price < s50 && price < s200) bear++;
+    }
+
+    // Advice
+    let advice = 'HOLD: Awaiting clearer signal.', klass='hold';
+    if(bull >= 3 && bear === 0){ advice = `STRONG BUY: ${fmtPrice(price)}`; klass='buy'; }
+    else if(bear >= 3 && bull === 0){ advice = `STRONG SELL: ${fmtPrice(price)}`; klass='sell'; }
+    else if(bull === 1 && bear === 0){ advice = `WEAK BUY: ${fmtPrice(price)}`; klass='buy'; }
+    else if(bear === 1 && bull === 0){ advice = `WEAK SELL: ${fmtPrice(price)}`; klass='sell'; }
+    else if(bull > bear && (bull - bear) >= 2){ advice = `WEAK BUY: ${fmtPrice(price)}`; klass='buy'; }
+    else if(bear > bull && (bear - bull) >= 2){ advice = `WEAK SELL: ${fmtPrice(price)}`; klass='sell'; }
+
+    // Confidence (simple)
+    const confidence = Math.round((Math.max(bull,bear)/4) * 100);
+
+    // Sentiment gauge (0 fear -> 100 greed)
+    let gauge = 50;
+    if(rsi!=null) gauge = 0.6 * rsi + 20;
+    if(macd!=null && signal!=null) gauge += (macd - signal) * 80;
+    if(s50!=null && s200!=null) gauge += (s50 > s200 ? 6 : -6);
+    gauge = Math.max(0, Math.min(100, gauge));
+
+    return { advice, klass, confidence, gauge, price, rsi, macd, signal, hist, s50, s200 };
+  }
+
+  function updateUIFromTA(ta){
+    if(!ta) return;
+    adviceLabel.classList.remove('buy','sell','hold');
+    adviceLabel.classList.add(ta.klass);
+    adviceLabel.textContent = ta.advice;
+    confBar.style.width = `${ta.confidence}%`;
+    confText.textContent = `Confidence: ~${ta.confidence}%`;
+    rsiVal.textContent = ta.rsi != null ? ta.rsi.toFixed(2) : '—';
+    macdVal.textContent = (ta.macd!=null && ta.signal!=null) ? `${ta.macd.toFixed(4)} / ${ta.signal.toFixed(4)}` : '—';
+    macdSig.textContent = ta.hist!=null ? `Hist: ${ta.hist.toFixed(4)}` : '—';
+    smaVal.textContent = (ta.s50!=null || ta.s200!=null) ? `${ta.s50?ta.s50.toFixed(2):'—'} / ${ta.s200?ta.s200.toFixed(2):'—'}` : '—';
+    sentimentText.textContent = `${ta.gauge <= 20 ? 'Extreme Fear' : ta.gauge <= 40 ? 'Fear' : ta.gauge >= 80 ? 'Extreme Greed' : ta.gauge >= 60 ? 'Greed' : 'Neutral'} (${Math.round(ta.gauge)})`;
+    gaugePointer.style.left = `${ta.gauge}%`;
+  }
+
+  // --- Load chart for given timeframe ---
+  async function loadTimeframe(tf){
+    try{
+      currentTF = tf;
+      document.querySelectorAll('.btn[data-tf]').forEach(b => b.classList.toggle('active', b.getAttribute('data-tf') === tf));
+      const cfg = TF_CFG[tf];
+      const raw = await getOHLC(cfg.days); // coinGecko returns appropriate granularity per days param
+      // For safety aggregate to desired bucket (CoinGecko usually returns right buckets but we ensure)
+      const candles = aggregateTo(raw, cfg.aggSec);
+      candleCache[tf] = candles;
+      candleSeries.setData(candles);
+
+      // Build and set SMA lines
+      const closes = candles.map(c=>c.close);
+      const times = candles.map(c=>c.time);
+      const s50 = SMA(closes,50);
+      const s200 = SMA(closes,200);
+      const s50Data = [], s200Data = [];
+      for(let i=0;i<times.length;i++){
+        if(s50[i]!=null) s50Data.push({ time: times[i], value: s50[i] });
+        if(s200[i]!=null) s200Data.push({ time: times[i], value: s200[i] });
+      }
+      sma50Line.setData(s50Data);
+      sma200Line.setData(s200Data);
+
+      const ta = computeTAFromCandles(candles);
+      updateUIFromTA(ta);
+      chart.timeScale().fitContent();
+    }catch(err){
+      console.error('loadTimeframe error', err);
+    }
+  }
+
+  // --- Ticker refresh & live update ---
+  async function refreshTicker(){
+    try{
+      const t = await getTicker();
+      bigPrice.innerHTML = `${fmtPrice(t.price)} <span class="small" id="priceChange">24h: ${(t.changePct>=0?'+':'') + (t.changePct??0).toFixed(2)}%</span>`;
+      priceChange.textContent = `24h: ${(t.changePct>=0?'+':'') + (t.changePct??0).toFixed(2)}%`;
+      priceChange.style.color = (t.changePct >= 0) ? 'var(--up)' : 'var(--down)';
+      high24.textContent = fmtPrice(t.high);
+      low24.textContent = fmtPrice(t.low);
+      vol24.textContent = fmtUSDCompact(t.volume);
+      mcap.textContent = fmtUSDCompact(t.mcap);
+      updated.textContent = nowStr(t.updatedAt);
+
+      // Apply live price to last candle on active TF to keep TA responsive
+      const candles = candleCache[currentTF];
+      if(candles && candles.length){
+        const patched = candles.slice();
+        patched[patched.length-1] = { ...patched[patched.length-1], close: t.price };
+        const ta = computeTAFromCandles(patched);
+        updateUIFromTA(ta);
+      }
+    }catch(err){
+      console.warn('refreshTicker error', err);
+    }
+  }
+
+  // --- TF buttons wiring ---
+  document.querySelectorAll('.btn[data-tf]').forEach(btn=>{
+    btn.addEventListener('click', async () => {
+      const tf = btn.getAttribute('data-tf');
+      if(tf === currentTF) return;
+      await loadTimeframe(tf);
+    });
+  });
+
+  // --- Initialization & loops ---
+  (async function init(){
+    await loadTimeframe('5m'); // initial
+    await refreshTicker();
+
+    // ticker every 5s
+    setInterval(refreshTicker, 5000);
+    // reload OHLC for current TF every 60s
+    setInterval(()=> loadTimeframe(currentTF), 60000);
+  })();
+
+  </script>
+</body>
+</html>
+
