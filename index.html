@@ -168,7 +168,7 @@
   const sma50Line = chart.addLineSeries({ color:'#00d1ff', lineWidth:1.6 });
   const sma200Line = chart.addLineSeries({ color:'#7e8a97', lineWidth:1.6 });
 
-  new ResizeObserver(()=> chart.applyOptions({})).observe(chartContainer);
+  new ResizeObserver(()=> chart.timeScale().fitContent()).observe(chartContainer);
 
   // --- CoinGecko endpoints & config ---
   const CG = {
@@ -263,25 +263,35 @@
 
   // --- Fetchers ---
   async function getTicker(){
-    const res = await fetch(CG.markets, { cache: 'no-store' });
-    if(!res.ok) throw new Error('Ticker fetch failed');
-    const [d] = await res.json();
-    return {
-      price: d.current_price,
-      high: d.high_24h,
-      low: d.low_24h,
-      volume: d.total_volume,
-      mcap: d.market_cap,
-      changePct: d.price_change_percentage_24h_in_currency ?? d.price_change_percentage_24h,
-      updatedAt: d.last_updated
-    };
+    try {
+      const res = await fetch(CG.markets, { cache: 'no-store' });
+      if(!res.ok) throw new Error('Ticker fetch failed');
+      const [d] = await res.json();
+      return {
+        price: d.current_price,
+        high: d.high_24h,
+        low: d.low_24h,
+        volume: d.total_volume,
+        mcap: d.market_cap,
+        changePct: d.price_change_percentage_24h_in_currency ?? d.price_change_percentage_24h,
+        updatedAt: d.last_updated
+      };
+    } catch (error) {
+      console.error("Error fetching ticker:", error);
+      return null;
+    }
   }
 
   async function getOHLC(days){
-    const res = await fetch(CG.ohlc(days), { cache: 'no-store' });
-    if(!res.ok) throw new Error('OHLC fetch failed');
-    const arr = await res.json(); // [ [t,o,h,l,c], ... ]
-    return arr.map(a => ({ time: Math.floor(a[0]/1000), open:a[1], high:a[2], low:a[3], close:a[4] })).sort((a,b)=>a.time-b.time);
+    try {
+      const res = await fetch(CG.ohlc(days), { cache: 'no-store' });
+      if(!res.ok) throw new Error('OHLC fetch failed');
+      const arr = await res.json(); // [ [t,o,h,l,c], ... ]
+      return arr.map(a => ({ time: Math.floor(a[0]/1000), open:a[1], high:a[2], low:a[3], close:a[4] })).sort((a,b)=>a.time-b.time);
+    } catch (error) {
+      console.error("Error fetching OHLC:", error);
+      return [];
+    }
   }
 
   // --- TA / Advice / UI Updates ---
@@ -349,6 +359,7 @@
     confBar.style.width = `${ta.confidence}%`;
     confText.textContent = `Confidence: ~${ta.confidence}%`;
     rsiVal.textContent = ta.rsi != null ? ta.rsi.toFixed(2) : '—';
+    rsiVal.className = 'ind-value' + (ta.rsi > 70 ? ' down' : ta.rsi < 30 ? ' up' : '');
     macdVal.textContent = (ta.macd!=null && ta.signal!=null) ? `${ta.macd.toFixed(4)} / ${ta.signal.toFixed(4)}` : '—';
     macdSig.textContent = ta.hist!=null ? `Hist: ${ta.hist.toFixed(4)}` : '—';
     smaVal.textContent = (ta.s50!=null || ta.s200!=null) ? `${ta.s50?ta.s50.toFixed(2):'—'} / ${ta.s200?ta.s200.toFixed(2):'—'}` : '—';
@@ -393,6 +404,8 @@
   async function refreshTicker(){
     try{
       const t = await getTicker();
+      if (!t) return; // Skip if fetch failed
+      
       bigPrice.innerHTML = `${fmtPrice(t.price)} <span class="small" id="priceChange">24h: ${(t.changePct>=0?'+':'') + (t.changePct??0).toFixed(2)}%</span>`;
       priceChange.textContent = `24h: ${(t.changePct>=0?'+':'') + (t.changePct??0).toFixed(2)}%`;
       priceChange.style.color = (t.changePct >= 0) ? 'var(--up)' : 'var(--down)';
@@ -438,4 +451,3 @@
   </script>
 </body>
 </html>
-
